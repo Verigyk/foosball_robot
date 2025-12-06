@@ -24,7 +24,7 @@ class FoosballEnv(gym.Env):
         self.rod_rotate_index = 40
 
         #p.connect(p.GUI) 
-        p.connect(p.DIRECT)
+        self.client = p.connect(p.DIRECT)
 
         # Action space: [position_translation, angle_rotation]
         self.action_space = gym.spaces.Box(
