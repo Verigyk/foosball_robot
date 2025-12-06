@@ -251,7 +251,6 @@ class FoosballEnv(gym.Env):
             reward -= 1000.0
             terminated = True
             self.goals_scored += 1
-            print(f"🎯 BUT MARQUÉ ! Total: {self.goals_scored}")
         
         # 6. Petite pénalité par step (encourage l'efficacité)
         reward -= 0.1
