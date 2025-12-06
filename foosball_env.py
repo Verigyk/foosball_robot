@@ -344,7 +344,7 @@ if __name__ == "__main__":
     print("\n[5/5] Démarrage de l'entraînement...")
     print("=" * 60)
     
-    total_timesteps = 5000  # 500k steps (ajustez selon vos besoins)
+    total_timesteps = 15000  # 500k steps (ajustez selon vos besoins)
     
     try:
         model.learn(
