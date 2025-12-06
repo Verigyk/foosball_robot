@@ -269,6 +269,7 @@ class FoosballEnv(gym.Env):
         }
 
         if (self.current_step > 10):
+            reward += 100
             terminated = True
         
         return observation, reward, terminated, truncated, info
