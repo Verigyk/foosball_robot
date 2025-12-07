@@ -553,16 +553,31 @@ def train_selfplay_rllib(num_iterations: int = 100,
     logging.getLogger("ray.rllib").setLevel(logging.ERROR)
     logging.getLogger("ray.tune").setLevel(logging.ERROR)
     
-    # Nettoyer les variables d'environnement Ray qui pourraient pointer vers un cluster distant
-    for env_var in ["RAY_ADDRESS", "RAY_HEAD_SERVICE_IP", "RAY_HEAD_SERVICE_PORT"]:
+    # Nettoyer TOUTES les variables d'environnement Ray (important sur serveur partagé)
+    ray_env_vars = [
+        "RAY_ADDRESS", "RAY_HEAD_SERVICE_IP", "RAY_HEAD_SERVICE_PORT",
+        "RAY_REDIS_ADDRESS", "RAY_GCS_ADDRESS", "RAY_CLUSTER_NAME",
+        "RAY_NAMESPACE", "RAY_RUNTIME_ENV_HOOK"
+    ]
+    for env_var in ray_env_vars:
         if env_var in os.environ:
             del os.environ[env_var]
             print(f"  ✓ Variable d'environnement {env_var} supprimée")
     
-    # Tenter de se connecter à un cluster existant ou en créer un nouveau
+    # Sur un serveur, arrêter tout cluster existant avant de commencer
+    print("  → Nettoyage des processus Ray existants...")
+    os.system("ray stop --force > /dev/null 2>&1")
+    time.sleep(2)
+    
+    # Créer un répertoire temporaire unique pour ce processus
+    import tempfile
+    temp_dir = tempfile.mkdtemp(prefix="ray_session_")
+    print(f"  → Répertoire temporaire: {temp_dir}")
+    
+    # Initialisation avec configuration serveur
     try:
         ray.init(
-            address="local",  # Force l'utilisation d'un cluster local
+            # Ne PAS utiliser "local" sur serveur - créer un nouveau cluster
             ignore_reinit_error=True, 
             num_cpus=num_workers+1, 
             logging_level=logging.ERROR,
@@ -570,19 +585,24 @@ def train_selfplay_rllib(num_iterations: int = 100,
             _system_config={
                 "metrics_report_interval_ms": 0,  # Disable metrics reporting
             },
-            # Configurations supplémentaires pour éviter les problèmes de connexion
-            _temp_dir=None,  # Utiliser le répertoire temporaire par défaut
-            include_dashboard=False,  # Désactiver le dashboard pour réduire les ressources
+            # Configurations critiques pour serveur partagé
+            _temp_dir=temp_dir,  # Répertoire unique pour éviter les conflits
+            include_dashboard=False,  # Pas de dashboard
+            namespace=f"foosball_{os.getpid()}",  # Namespace unique par processus
         )
-        print("  ✓ Ray initialisé avec succès")
+        print("  ✓ Ray initialisé avec succès (nouveau cluster local)")
     except Exception as e:
-        print(f"  ⚠️  Erreur lors de l'initialisation de Ray: {e}")
-        print("  → Tentative d'arrêt des processus Ray existants...")
-        os.system("ray stop --force")
-        time.sleep(2)
-        print("  → Nouvelle tentative d'initialisation...")
+        print(f"  ⚠️  Erreur lors de l'initialisation: {e}")
+        print("  → Tentative de nettoyage approfondi...")
+        
+        # Nettoyage plus agressif
+        os.system("pkill -9 -f 'ray::'")
+        os.system("pkill -9 -f 'gcs_server'")
+        os.system("pkill -9 -f 'raylet'")
+        time.sleep(3)
+        
+        print("  → Nouvelle tentative...")
         ray.init(
-            address="local",
             ignore_reinit_error=True, 
             num_cpus=num_workers+1, 
             logging_level=logging.ERROR,
@@ -590,9 +610,11 @@ def train_selfplay_rllib(num_iterations: int = 100,
             _system_config={
                 "metrics_report_interval_ms": 0,
             },
+            _temp_dir=temp_dir,
             include_dashboard=False,
+            namespace=f"foosball_{os.getpid()}",
         )
-        print("  ✓ Ray initialisé après nettoyage")
+        print("  ✓ Ray initialisé après nettoyage approfondi")
     
     # Avec la nouvelle API stack, on définit juste le policy mapping
     # Les politiques sont créées automatiquement par RLlib
