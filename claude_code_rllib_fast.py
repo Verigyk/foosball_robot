@@ -188,7 +188,8 @@ def train_fast(
     lstm_size: int = 128,
     use_gpu: bool = False,
     fast_physics: bool = True,
-    render: bool = False
+    render: bool = False,
+    force_local_mode: bool = False
 ):
     """
     Entraînement OPTIMISÉ
@@ -201,6 +202,7 @@ def train_fast(
         use_gpu: Utiliser GPU si disponible
         fast_physics: Physique simplifiée (plus rapide)
         render: Afficher la simulation (très lent)
+        force_local_mode: Forcer le mode local (single-process) pour serveurs avec restrictions
     """
     import ray
     from ray.rllib.algorithms.ppo import PPOConfig
@@ -261,43 +263,65 @@ def train_fast(
     print(f"  → Répertoire temporaire: {temp_dir}")
     
     # Initialisation avec configuration serveur
-    try:
+    if force_local_mode:
+        # Mode local forcé (serveurs avec restrictions)
+        print("  → Mode LOCAL forcé (restrictions serveur)")
         ray.init(
-            # Ne PAS utiliser "local" sur serveur - créer un nouveau cluster
+            local_mode=True,
             ignore_reinit_error=True,
-            num_cpus=num_workers+1,
-            num_gpus=num_gpus,
             logging_level=logging.ERROR,
-            _metrics_export_port=None,
-            _system_config={"metrics_report_interval_ms": 0},
-            _temp_dir=temp_dir,  # Répertoire unique pour éviter les conflits
-            include_dashboard=False,
-            namespace=f"foosball_{os.getpid()}",  # Namespace unique par processus
         )
-        print("  ✓ Ray initialisé avec succès (nouveau cluster local)")
-    except Exception as e:
-        print(f"  ⚠️  Erreur lors de l'initialisation: {e}")
-        print("  → Tentative de nettoyage approfondi...")
-        
-        # Nettoyage plus agressif
-        os.system("pkill -9 -f 'ray::'")
-        os.system("pkill -9 -f 'gcs_server'")
-        os.system("pkill -9 -f 'raylet'")
-        time.sleep(3)
-        
-        print("  → Nouvelle tentative...")
-        ray.init(
-            ignore_reinit_error=True,
-            num_cpus=num_workers+1,
-            num_gpus=num_gpus,
-            logging_level=logging.ERROR,
-            _metrics_export_port=None,
-            _system_config={"metrics_report_interval_ms": 0},
-            _temp_dir=temp_dir,
-            include_dashboard=False,
-            namespace=f"foosball_{os.getpid()}",
-        )
-        print("  ✓ Ray initialisé après nettoyage approfondi")
+        print("  ✓ Ray initialisé en MODE LOCAL (single-process)")
+        print("  ⚠️  Note: Pas de parallélisme, entraînement séquentiel")
+        num_workers = 0
+    else:
+        try:
+            # Essayer d'abord le mode normal
+            ray.init(
+                # Ne PAS utiliser "local" sur serveur - créer un nouveau cluster
+                ignore_reinit_error=True,
+                num_cpus=num_workers+1,
+                num_gpus=num_gpus,
+                logging_level=logging.ERROR,
+                _metrics_export_port=None,
+                _system_config={"metrics_report_interval_ms": 0},
+                _temp_dir=temp_dir,  # Répertoire unique pour éviter les conflits
+                include_dashboard=False,
+                namespace=f"foosball_{os.getpid()}",  # Namespace unique par processus
+            )
+            print("  ✓ Ray initialisé avec succès (mode multi-processus)")
+        except Exception as e:
+                print(f"  ⚠️  Erreur lors de l'initialisation normale: {e}")
+                print("  → Tentative en mode LOCAL (single-process, restrictions serveur)...")
+                
+                # MODE LOCAL: Tout dans un seul processus, pas de réseau/ports
+                try:
+                    ray.init(
+                        local_mode=True,  # MODE CRITIQUE: Un seul processus, pas de GCS
+                        ignore_reinit_error=True,
+                        logging_level=logging.ERROR,
+                    )
+                    print("  ✓ Ray initialisé en MODE LOCAL (single-process)")
+                    print("  ⚠️  Note: Mode single-process = pas de parallélisme, plus lent")
+                    num_workers = 0  # Forcer 0 workers en mode local
+                except Exception as e2:
+                    print(f"  ❌ Échec du mode local: {e2}")
+                    print("  → Tentative de nettoyage approfondi...")
+                    
+                    # Nettoyage plus agressif
+                    os.system("pkill -9 -f 'ray::'")
+                    os.system("pkill -9 -f 'gcs_server'")
+                    os.system("pkill -9 -f 'raylet'")
+                    time.sleep(3)
+                    
+                    print("  → Nouvelle tentative en mode local...")
+                    ray.init(
+                        local_mode=True,
+                        ignore_reinit_error=True,
+                        logging_level=logging.ERROR,
+                    )
+                    print("  ✓ Ray initialisé en MODE LOCAL après nettoyage")
+                    num_workers = 0
     
     # Configuration modèle
     if use_lstm:
@@ -483,6 +507,7 @@ if __name__ == "__main__":
         # Parser les arguments
         render = False
         num_workers = num_workers_default
+        force_local = False
         
         for i, arg in enumerate(sys.argv):
             if arg == "--render" or arg == "-r":
@@ -491,6 +516,9 @@ if __name__ == "__main__":
                 if i + 1 < len(sys.argv) and sys.argv[i + 1].isdigit():
                     num_workers = int(sys.argv[i + 1])
                     print(f"✓ Nombre de threads/workers défini: {num_workers}")
+            elif arg == "--local" or arg == "-l":
+                force_local = True
+                print(f"✓ Mode LOCAL forcé (single-process pour serveur avec restrictions)")
         
         if command == "fast":
             # Mode rapide: feedforward + fast physics
@@ -502,7 +530,8 @@ if __name__ == "__main__":
                 use_lstm=False,
                 use_gpu=use_gpu,
                 fast_physics=True,
-                render=render
+                render=render,
+                force_local_mode=force_local
             )
         
         elif command == "lstm":
@@ -516,7 +545,8 @@ if __name__ == "__main__":
                 lstm_size=128,
                 use_gpu=use_gpu,
                 fast_physics=True,
-                render=render
+                render=render,
+                force_local_mode=force_local
             )
         
         elif command == "quality":
@@ -530,7 +560,8 @@ if __name__ == "__main__":
                 lstm_size=256,
                 use_gpu=use_gpu,
                 fast_physics=False,
-                render=render
+                render=render,
+                force_local_mode=force_local
             )
         
         else:
@@ -543,12 +574,14 @@ if __name__ == "__main__":
             print("  --render, -r              Afficher la simulation (TRÈS lent)")
             print("  --threads N, -t N         Nombre de threads/workers parallèles")
             print("  --workers N, -w N         Alias pour --threads")
+            print("  --local, -l               Mode local (single-process, pour serveurs avec restrictions)")
             print("")
             print("Exemples:")
             print("  python claude_code_rllib_fast.py fast 50")
             print("  python claude_code_rllib_fast.py lstm 100 --threads 8")
             print("  python claude_code_rllib_fast.py quality 100 -t 4")
             print("  python claude_code_rllib_fast.py fast 10 --render  # Avec visualisation")
+            print("  python claude_code_rllib_fast.py lstm 100 --local  # Mode serveur restreint")
     else:
         print("="*70)
         print("⚡ ENTRAÎNEMENT OPTIMISÉ - BABY-FOOT RL")
@@ -567,6 +600,8 @@ if __name__ == "__main__":
         print("                            Utilise 1 worker au lieu de plusieurs")
         print("  --threads N, -t N         Nombre de threads/workers parallèles")
         print("  --workers N, -w N         Alias pour --threads")
+        print("  --local, -l               Mode local (single-process, pour serveurs avec restrictions)")
+        print("                            Contourne les problèmes de ports/GCS Ray")
         print("")
         print("Exemples:")
         print("  python claude_code_rllib_fast.py fast 50          # Rapide")
@@ -574,6 +609,7 @@ if __name__ == "__main__":
         print("  python claude_code_rllib_fast.py quality 100      # Qualité")
         print("  python claude_code_rllib_fast.py fast 10 --render # Avec GUI")
         print("  python claude_code_rllib_fast.py lstm 100 -t 8    # 8 threads")
+        print("  python claude_code_rllib_fast.py lstm 100 --local # Serveur restreint")
         print("")
         print(f"Configuration détectée:")
         print(f"  CPU cores: {num_cores}")
