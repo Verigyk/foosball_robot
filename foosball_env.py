@@ -23,8 +23,8 @@ class FoosballEnv(gym.Env):
         self.rod_slide_index = 39
         self.rod_rotate_index = 40
 
-        #p.connect(p.GUI) 
-        self.client = p.connect(p.DIRECT)
+        self.client = p.connect(p.GUI) 
+        #self.client = p.connect(p.DIRECT)
 
         # Action space: [position_translation, angle_rotation]
         self.action_space = gym.spaces.Box(
@@ -289,6 +289,7 @@ if __name__ == "__main__":
     from stable_baselines3.common.env_checker import check_env
     from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
     from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+    '''
     
     print("=" * 60)
     print("ENTRAÎNEMENT PPO - BABY-FOOT")
@@ -371,7 +372,8 @@ if __name__ == "__main__":
     # =============================================================================
     # TEST DU MODÈLE ENTRAÎNÉ
     # =============================================================================
-    
+    '''
+
     print("\n" + "=" * 60)
     print("TEST DU MODÈLE")
     print("=" * 60)

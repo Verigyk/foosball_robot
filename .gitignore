@@ -1,0 +1,17 @@
+ppo_foosball_final.zip
+pretraining_models/agent0_attack_interrupted.zip
+pretraining_models/agent0_defense_interrupted.zip
+pretraining_tensorboard/agent0_attack/PPO_1/events.out.tfevents.1765081046.LAPTOP-VNSUPAIF.13192.0
+pretraining_tensorboard/agent0_attack/PPO_2/events.out.tfevents.1765081263.LAPTOP-VNSUPAIF.13949.0
+pretraining_tensorboard/agent0_attack/PPO_3/events.out.tfevents.1765081335.LAPTOP-VNSUPAIF.14466.0
+pretraining_tensorboard/agent0_attack/PPO_4/events.out.tfevents.1765081811.LAPTOP-VNSUPAIF.18664.1
+pretraining_tensorboard/agent0_attack/PPO_5/events.out.tfevents.1765081947.LAPTOP-VNSUPAIF.20415.0
+pretraining_tensorboard/agent0_defense/PPO_1/events.out.tfevents.1765077644.LAPTOP-VNSUPAIF.3041.0
+pretraining_tensorboard/agent0_defense/PPO_2/events.out.tfevents.1765078141.LAPTOP-VNSUPAIF.4809.0
+pretraining_tensorboard/agent0_defense/PPO_3/events.out.tfevents.1765078522.LAPTOP-VNSUPAIF.5823.0
+pretraining_tensorboard/agent0_defense/PPO_4/events.out.tfevents.1765078813.LAPTOP-VNSUPAIF.6571.0
+pretraining_tensorboard/agent0_defense/PPO_5/events.out.tfevents.1765079078.LAPTOP-VNSUPAIF.7763.0
+pretraining_tensorboard/agent0_defense/PPO_6/events.out.tfevents.1765079574.LAPTOP-VNSUPAIF.8805.0
+pretraining_tensorboard/agent0_defense/PPO_7/events.out.tfevents.1765080616.LAPTOP-VNSUPAIF.11588.0
+pretraining_tensorboard/agent0_defense/PPO_8/events.out.tfevents.1765081781.LAPTOP-VNSUPAIF.18664.0
+pretraining_tensorboard/agent0_defense/PPO_9/events.out.tfevents.1765081859.LAPTOP-VNSUPAIF.19479.0
