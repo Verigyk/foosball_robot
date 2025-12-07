@@ -76,15 +76,38 @@ class FoosballPreTrainingEnv(gym.Env):
             dtype=np.float32
         )
         
-        # Observation space: [ball_x, ball_y, ball_vx, ball_vy, agent_slide, agent_angle]
+        # Observation space: [ball_x, ball_y, ball_vx, ball_vy, agent_slide, agent_angle,
+        #                    rod1_slide, rod1_angle, rod2_slide, rod2_angle, rod3_slide, rod3_angle, rod4_slide, rod4_angle,
+        #                    rod5_slide, rod5_angle, rod6_slide, rod6_angle, rod7_slide, rod7_angle, rod8_slide, rod8_angle]
+        # Total: 6 (ball + agent) + 16 (8 rods × 2) = 22 dimensions
         self.observation_space = gym.spaces.Box(
             low=np.array([
-                -self.x_max, -self.y_max, -50, -50,
-                self.slide_min, -np.pi
+                -self.x_max, -self.y_max, -50, -50,  # Balle
+                self.slide_min, -np.pi,               # Agent actuel
+                # Team1 Rods (4 rods)
+                self.slide_min, -np.pi,  # Rod 1 (Goalie)
+                self.slide_min, -np.pi,  # Rod 2 (Defense)
+                self.slide_min, -np.pi,  # Rod 3 (Forward)
+                self.slide_min, -np.pi,  # Rod 4 (Midfield)
+                # Team2 Rods (4 rods)
+                self.slide_min, -np.pi,  # Rod 5 (Midfield)
+                self.slide_min, -np.pi,  # Rod 6 (Forward)
+                self.slide_min, -np.pi,  # Rod 7 (Defense)
+                self.slide_min, -np.pi,  # Rod 8 (Goalie)
             ], dtype=np.float32),
             high=np.array([
-                self.x_max, self.y_max, 50, 50,
-                self.slide_max, np.pi
+                self.x_max, self.y_max, 50, 50,      # Balle
+                self.slide_max, np.pi,                # Agent actuel
+                # Team1 Rods (4 rods)
+                self.slide_max, np.pi,   # Rod 1 (Goalie)
+                self.slide_max, np.pi,   # Rod 2 (Defense)
+                self.slide_max, np.pi,   # Rod 3 (Forward)
+                self.slide_max, np.pi,   # Rod 4 (Midfield)
+                # Team2 Rods (4 rods)
+                self.slide_max, np.pi,   # Rod 5 (Midfield)
+                self.slide_max, np.pi,   # Rod 6 (Forward)
+                self.slide_max, np.pi,   # Rod 7 (Defense)
+                self.slide_max, np.pi,   # Rod 8 (Goalie)
             ], dtype=np.float32),
             dtype=np.float32
         )
@@ -176,31 +199,48 @@ class FoosballPreTrainingEnv(gym.Env):
             )
 
     def _get_observation(self) -> np.ndarray:
-        """Récupère l'observation pour l'agent actuel"""
+        """Récupère l'observation pour l'agent actuel, incluant l'état de toutes les rods"""
         try:
             # Position et vélocité de la balle
             ball_pos, _ = p.getBasePositionAndOrientation(self.ball_id)
             ball_vel, _ = p.getBaseVelocity(self.ball_id)
             
-            # État de l'agent
+            # État de l'agent actuel
             config = self.agent_configs[self.agent_id]
             slide_state = p.getJointState(self.table_id, config["slide_idx"])
             rotate_state = p.getJointState(self.table_id, config["rotate_idx"])
             
-            observation = np.array([
+            # Construire l'observation de base
+            obs_list = [
                 np.clip(ball_pos[0], -self.x_max, self.x_max),
                 np.clip(ball_pos[1], -self.y_max, self.y_max),
                 np.clip(ball_vel[0], -50, 50),
                 np.clip(ball_vel[1], -50, 50),
                 slide_state[0],
                 rotate_state[0]
-            ], dtype=np.float32)
+            ]
+            
+            # Ajouter l'état de toutes les rods Team1 (dans l'ordre des IDs: 0, 1, 2, 3)
+            for agent_id in range(4):
+                cfg = self.agent_configs[agent_id]
+                slide = p.getJointState(self.table_id, cfg["slide_idx"])[0]
+                angle = p.getJointState(self.table_id, cfg["rotate_idx"])[0]
+                obs_list.extend([slide, angle])
+            
+            # Ajouter l'état de toutes les rods Team2 (dans l'ordre: rod5, rod6, rod7, rod8)
+            for rod_name in ["rod5", "rod6", "rod7", "rod8"]:
+                rod_cfg = self.opponent_joints[rod_name]
+                slide = p.getJointState(self.table_id, rod_cfg["slide_idx"])[0]
+                angle = p.getJointState(self.table_id, rod_cfg["rotate_idx"])[0]
+                obs_list.extend([slide, angle])
+            
+            observation = np.array(obs_list, dtype=np.float32)
             
             return observation
         
         except Exception as e:
             print(f"❌ Erreur dans _get_observation: {e}")
-            return np.zeros(6, dtype=np.float32)
+            return np.zeros(22, dtype=np.float32)
 
     def reset(self, seed=None, options=None) -> Tuple[np.ndarray, Dict]:
         super().reset(seed=seed)
@@ -231,35 +271,160 @@ class FoosballPreTrainingEnv(gym.Env):
         
         if self.phase == TrainingPhase.DEFENSE:
             # DEFENSE: Ballon arrive rapidement vers les buts
+            # 80% de chance que la balle se dirige vers les buts
+            goes_to_goal = np.random.random() < 0.8
+            
             # Déterminer de quel côté est l'agent
             if agent_x < 0:  # Agent à gauche, défend le but gauche
                 ball_start_x = np.random.uniform(0.3, 0.6)
-                initial_velocity_x = np.random.uniform(-25, -15)  # Rapide vers la gauche
+                ball_start_y = np.random.uniform(-0.15, 0.15)
                 self.defending_goal = self.goal_line_left
+                
+                # Position du but à défendre
+                goal_x = self.goal_line_left
+                
+                if goes_to_goal:
+                    # La balle va vers le but (avec variation aléatoire sur Y)
+                    goal_y = np.random.uniform(-0.15, 0.15)  # Point aléatoire dans le but
+                    
+                    # Vecteur de la balle vers ce point du but
+                    direction_x = goal_x - ball_start_x  # Négatif (va vers la gauche)
+                    direction_y = goal_y - ball_start_y
+                    
+                    # Normaliser et appliquer une vitesse élevée
+                    norm = np.sqrt(direction_x**2 + direction_y**2)
+                    speed = np.random.uniform(15, 25)  # Vitesse rapide
+                    initial_velocity_x = (direction_x / norm) * speed
+                    initial_velocity_y = (direction_y / norm) * speed
+                else:
+                    # Tir raté : la balle va dans la bonne direction X mais rate le but (trop haut ou bas en Y)
+                    direction_x = goal_x - ball_start_x  # Négatif (va vers la gauche)
+                    # Vise à côté du but (en dehors de la zone [-0.15, 0.15])
+                    if np.random.random() < 0.5:
+                        target_y = np.random.uniform(0.2, 0.4)  # Rate par le haut
+                    else:
+                        target_y = np.random.uniform(-0.4, -0.2)  # Rate par le bas
+                    direction_y = target_y - ball_start_y
+                    
+                    norm = np.sqrt(direction_x**2 + direction_y**2)
+                    speed = np.random.uniform(10, 20)  # Vitesse modérée
+                    initial_velocity_x = (direction_x / norm) * speed
+                    initial_velocity_y = (direction_y / norm) * speed
+                    
             else:  # Agent à droite, défend le but droit
                 ball_start_x = np.random.uniform(-0.6, -0.3)
-                initial_velocity_x = np.random.uniform(15, 25)  # Rapide vers la droite
+                ball_start_y = np.random.uniform(-0.15, 0.15)
                 self.defending_goal = self.goal_line_right
-            
-            ball_start_y = np.random.uniform(-0.15, 0.15)
-            initial_velocity_y = np.random.uniform(-5, 5)
+                
+                # Position du but à défendre
+                goal_x = self.goal_line_right
+                
+                if goes_to_goal:
+                    # La balle va vers le but (avec variation aléatoire sur Y)
+                    goal_y = np.random.uniform(-0.15, 0.15)  # Point aléatoire dans le but
+                    
+                    # Vecteur de la balle vers ce point du but
+                    direction_x = goal_x - ball_start_x  # Positif (va vers la droite)
+                    direction_y = goal_y - ball_start_y
+                    
+                    # Normaliser et appliquer une vitesse élevée
+                    norm = np.sqrt(direction_x**2 + direction_y**2)
+                    speed = np.random.uniform(15, 25)  # Vitesse rapide
+                    initial_velocity_x = (direction_x / norm) * speed
+                    initial_velocity_y = (direction_y / norm) * speed
+                else:
+                    # Tir raté : la balle va dans la bonne direction X mais rate le but (trop haut ou bas en Y)
+                    direction_x = goal_x - ball_start_x  # Positif (va vers la droite)
+                    # Vise à côté du but (en dehors de la zone [-0.15, 0.15])
+                    if np.random.random() < 0.5:
+                        target_y = np.random.uniform(0.2, 0.4)  # Rate par le haut
+                    else:
+                        target_y = np.random.uniform(-0.4, -0.2)  # Rate par le bas
+                    direction_y = target_y - ball_start_y
+                    
+                    norm = np.sqrt(direction_x**2 + direction_y**2)
+                    speed = np.random.uniform(10, 20)  # Vitesse modérée
+                    initial_velocity_x = (direction_x / norm) * speed
+                    initial_velocity_y = (direction_y / norm) * speed
         
         else:  # ATTACK
             # ATTACK: Ballon devant l'agent
+            # 80% de chance que la balle se dirige déjà vers les buts
+            goes_to_goal = np.random.random() < 0.8
+            
             # Position légèrement devant l'agent
-
             limitation = np.random.uniform(-0.02, 0.10)
-
             ball_start_x = agent_x + (limitation if agent_x < 0 else -limitation)
             ball_start_y = np.random.uniform(-0.08, 0.08)
-            initial_velocity_x = 0.0
-            initial_velocity_y = 0.0
             
             # Déterminer le but à attaquer
             if agent_x < 0:  # Agent à gauche, attaque le but droit
                 self.attacking_goal = self.goal_line_right
+                
+                # Position du but à attaquer
+                goal_x = self.goal_line_right
+                
+                if goes_to_goal:
+                    # La balle va vers le but (avec variation aléatoire sur Y)
+                    goal_y = np.random.uniform(-0.15, 0.15)  # Point aléatoire dans le but
+                    
+                    # Vecteur de la balle vers ce point du but
+                    direction_x = goal_x - ball_start_x  # Positif (va vers la droite)
+                    direction_y = goal_y - ball_start_y
+                    
+                    # Normaliser et appliquer une vitesse modérée
+                    norm = np.sqrt(direction_x**2 + direction_y**2)
+                    speed = np.random.uniform(5, 15)  # Vitesse modérée pour l'attaque
+                    initial_velocity_x = (direction_x / norm) * speed
+                    initial_velocity_y = (direction_y / norm) * speed
+                else:
+                    # Tir raté : la balle va dans la bonne direction X mais rate le but (trop haut ou bas en Y)
+                    direction_x = goal_x - ball_start_x  # Positif (va vers la droite)
+                    # Vise à côté du but (en dehors de la zone [-0.15, 0.15])
+                    if np.random.random() < 0.5:
+                        target_y = np.random.uniform(0.2, 0.4)  # Rate par le haut
+                    else:
+                        target_y = np.random.uniform(-0.4, -0.2)  # Rate par le bas
+                    direction_y = target_y - ball_start_y
+                    
+                    norm = np.sqrt(direction_x**2 + direction_y**2)
+                    speed = np.random.uniform(3, 10)  # Vitesse faible à modérée
+                    initial_velocity_x = (direction_x / norm) * speed
+                    initial_velocity_y = (direction_y / norm) * speed
+                    
             else:  # Agent à droite, attaque le but gauche
                 self.attacking_goal = self.goal_line_left
+                
+                # Position du but à attaquer
+                goal_x = self.goal_line_left
+                
+                if goes_to_goal:
+                    # La balle va vers le but (avec variation aléatoire sur Y)
+                    goal_y = np.random.uniform(-0.15, 0.15)  # Point aléatoire dans le but
+                    
+                    # Vecteur de la balle vers ce point du but
+                    direction_x = goal_x - ball_start_x  # Négatif (va vers la gauche)
+                    direction_y = goal_y - ball_start_y
+                    
+                    # Normaliser et appliquer une vitesse modérée
+                    norm = np.sqrt(direction_x**2 + direction_y**2)
+                    speed = np.random.uniform(5, 15)  # Vitesse modérée pour l'attaque
+                    initial_velocity_x = (direction_x / norm) * speed
+                    initial_velocity_y = (direction_y / norm) * speed
+                else:
+                    # Tir raté : la balle va dans la bonne direction X mais rate le but (trop haut ou bas en Y)
+                    direction_x = goal_x - ball_start_x  # Négatif (va vers la gauche)
+                    # Vise à côté du but (en dehors de la zone [-0.15, 0.15])
+                    if np.random.random() < 0.5:
+                        target_y = np.random.uniform(0.2, 0.4)  # Rate par le haut
+                    else:
+                        target_y = np.random.uniform(-0.4, -0.2)  # Rate par le bas
+                    direction_y = target_y - ball_start_y
+                    
+                    norm = np.sqrt(direction_x**2 + direction_y**2)
+                    speed = np.random.uniform(3, 10)  # Vitesse faible à modérée
+                    initial_velocity_x = (direction_x / norm) * speed
+                    initial_velocity_y = (direction_y / norm) * speed
         
         # Créer la balle
         self.ball_id = p.createMultiBody(
@@ -654,26 +819,28 @@ def pretrain_all_agents(defense_timesteps: int = 100000, attack_timesteps: int =
     Pré-entraîne tous les 4 agents séquentiellement
     
     Pipeline:
-    1. Agent 0 (Goalkeeper Team1) - Defense
-    2. Agent 0 (Goalkeeper Team1) - Attack
-    3. Agent 1 (Defense Team1) - Defense
-    4. Agent 1 (Defense Team1) - Attack
-    5. Agent 2 (Forward Team1) - Defense
-    6. Agent 2 (Forward Team1) - Attack
-    7. Agent 3 (Midfield Team1) - Defense
-    8. Agent 3 (Midfield Team1) - Attack
+    1. Agent 0 (Goalkeeper Team1) - Defense puis Attack (même modèle)
+    2. Agent 1 (Defense Team1) - Defense puis Attack (même modèle)
+    3. Agent 2 (Forward Team1) - Defense puis Attack (même modèle)
+    4. Agent 3 (Midfield Team1) - Defense puis Attack (même modèle)
     
     Args:
         defense_timesteps: Nombre de timesteps pour chaque entraînement défense
         attack_timesteps: Nombre de timesteps pour chaque entraînement attaque
         render: Afficher la visualisation pendant l'entraînement
     """
+    from stable_baselines3 import PPO
+    from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+    from stable_baselines3.common.callbacks import CheckpointCallback
+    import shutil
+    
     print("\n" + "=" * 70)
     print("PRÉ-ENTRAÎNEMENT COMPLET - 4 AGENTS - 2 PHASES")
     print("=" * 70)
     print(f"Defense timesteps: {defense_timesteps}")
     print(f"Attack timesteps: {attack_timesteps}")
     print(f"Visualisation: {'OUI (lent)' if render else 'NON (rapide)'}")
+    print(f"NOTE: Le même modèle est utilisé pour défense et attaque")
     print("=" * 70)
     
     models = {}
@@ -698,15 +865,72 @@ def pretrain_all_agents(defense_timesteps: int = 100000, attack_timesteps: int =
         )
         models[f"agent{agent_id}_defense"] = defense_model
         
-        # Phase 2: Attack
-        print(f"\n>>> Phase 2/2: ATTACK")
-        attack_model = pretrain_agent(
-            agent_id=agent_id,
-            phase=TrainingPhase.ATTACK,
-            timesteps=attack_timesteps,
-            render=render
+        # Sauvegarder une backup du modèle défense
+        backup_path = f"pretraining_models/agent{agent_id}_defense_backup.zip"
+        defense_model.save(backup_path)
+        print(f"\n💾 Backup défense sauvegardée: {backup_path}")
+        
+        # Phase 2: Attack (continuer l'entraînement avec le même modèle)
+        print(f"\n>>> Phase 2/2: ATTACK (continue avec le même modèle)")
+        
+        # Créer l'environnement d'attaque
+        def make_attack_env():
+            env = FoosballPreTrainingEnv(
+                agent_id=agent_id,
+                phase=TrainingPhase.ATTACK,
+                render_mode="human" if render else None
+            )
+            return env
+        
+        # Environnements pour l'attaque
+        if render:
+            attack_env = DummyVecEnv([make_attack_env])
+            print("🎨 Mode VISUALISATION activé (1 environnement)")
+        else:
+            attack_env = SubprocVecEnv([make_attack_env for _ in range(4)])
+            print("⚡ Mode RAPIDE activé (4 environnements parallèles)")
+        
+        # Changer l'environnement du modèle existant
+        defense_model.set_env(attack_env)
+        
+        # Callbacks pour l'attaque
+        model_name = f"agent{agent_id}_attack"
+        checkpoint_callback = CheckpointCallback(
+            save_freq=10000,
+            save_path=f'./pretraining_models/',
+            name_prefix=model_name
         )
-        models[f"agent{agent_id}_attack"] = attack_model
+        
+        print(f"Entraînement sur {attack_timesteps} timesteps...")
+        print("=" * 70)
+        
+        try:
+            defense_model.learn(
+                total_timesteps=attack_timesteps,
+                callback=checkpoint_callback,
+                progress_bar=True,
+                reset_num_timesteps=False  # Continue l'entraînement
+            )
+            
+            print("\n" + "=" * 70)
+            print("✓ ENTRAÎNEMENT ATTACK TERMINÉ!")
+            print("=" * 70)
+            
+            # Sauvegarder le modèle final (défense + attaque)
+            final_path = f"pretraining_models/agent{agent_id}_combined_final.zip"
+            defense_model.save(final_path)
+            print(f"✓ Modèle combiné sauvegardé: {final_path}")
+            
+            models[f"agent{agent_id}_attack"] = defense_model
+            models[f"agent{agent_id}_combined"] = defense_model
+            
+        except KeyboardInterrupt:
+            print("\n⚠️  Entraînement interrompu par l'utilisateur")
+            defense_model.save(f"pretraining_models/agent{agent_id}_attack_interrupted")
+            print(f"✓ Modèle sauvegardé: pretraining_models/agent{agent_id}_attack_interrupted.zip")
+        
+        finally:
+            attack_env.close()
         
         print(f"\n✓ Agent {agent_id} pré-entraîné avec succès!")
     
@@ -715,8 +939,8 @@ def pretrain_all_agents(defense_timesteps: int = 100000, attack_timesteps: int =
     print("=" * 70)
     print("\nModèles sauvegardés:")
     for i in range(4):
-        print(f"  - Agent {i} Defense: pretraining_models/agent{i}_defense_final.zip")
-        print(f"  - Agent {i} Attack: pretraining_models/agent{i}_attack_final.zip")
+        print(f"  - Agent {i} Defense Backup: pretraining_models/agent{i}_defense_backup.zip")
+        print(f"  - Agent {i} Defense+Attack Combined: pretraining_models/agent{i}_combined_final.zip")
     print("=" * 70)
     
     return models
