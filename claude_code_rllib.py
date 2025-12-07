@@ -33,24 +33,25 @@ class FoosballMARLEnv(gym.Env):
         self.team2_goals = 0
         
         # Configuration des barres Team1 (rods 1-4, joints 2-17)
+        # Limites de glissement selon URDF
         self.agent_configs = {
-            0: {"name": "Team1_Rod1_Goalie", "slide_idx": 2, "rotate_idx": 3, "x_pos": -0.625},
-            1: {"name": "Team1_Rod2_Defense", "slide_idx": 7, "rotate_idx": 8, "x_pos": -0.45},
-            2: {"name": "Team1_Rod3_Forward", "slide_idx": 11, "rotate_idx": 12, "x_pos": -0.275},
-            3: {"name": "Team1_Rod4_Midfield", "slide_idx": 16, "rotate_idx": 17, "x_pos": -0.10},
+            0: {"name": "Team1_Rod1_Goalie", "slide_idx": 2, "rotate_idx": 3, "x_pos": -0.625, "slide_min": -0.12, "slide_max": 0.12},
+            1: {"name": "Team1_Rod2_Defense", "slide_idx": 7, "rotate_idx": 8, "x_pos": -0.45, "slide_min": -0.18, "slide_max": 0.18},
+            2: {"name": "Team1_Rod3_Forward", "slide_idx": 11, "rotate_idx": 12, "x_pos": -0.275, "slide_min": -0.12, "slide_max": 0.12},
+            3: {"name": "Team1_Rod4_Midfield", "slide_idx": 16, "rotate_idx": 17, "x_pos": -0.10, "slide_min": -0.08, "slide_max": 0.08},
         }
         
         # Joints Team2 (rods 5-8, joints 23-40)
         self.opponent_joints = {
-            0: {"name": "Team2_Rod8_Goalie", "slide_idx": 39, "rotate_idx": 40, "x_pos": 0.625},
-            1: {"name": "Team2_Rod7_Defense", "slide_idx": 35, "rotate_idx": 36, "x_pos": 0.45},
-            2: {"name": "Team2_Rod6_Forward", "slide_idx": 30, "rotate_idx": 31, "x_pos": 0.275},
-            3: {"name": "Team2_Rod5_Midfield", "slide_idx": 23, "rotate_idx": 24, "x_pos": 0.10},
+            0: {"name": "Team2_Rod8_Goalie", "slide_idx": 39, "rotate_idx": 40, "x_pos": 0.625, "slide_min": -0.12, "slide_max": 0.12},
+            1: {"name": "Team2_Rod7_Defense", "slide_idx": 35, "rotate_idx": 36, "x_pos": 0.45, "slide_min": -0.18, "slide_max": 0.18},
+            2: {"name": "Team2_Rod6_Forward", "slide_idx": 30, "rotate_idx": 31, "x_pos": 0.275, "slide_min": -0.12, "slide_max": 0.12},
+            3: {"name": "Team2_Rod5_Midfield", "slide_idx": 23, "rotate_idx": 24, "x_pos": 0.10, "slide_min": -0.08, "slide_max": 0.08},
         }
         
-        # Limites
-        self.slide_min = -0.1
-        self.slide_max = 0.1
+        # Limites globales pour observation space (valeurs maximales)
+        self.slide_min_global = -0.18  # Max range pour observation space
+        self.slide_max_global = 0.18
         self.x_max = 1.0
         self.y_max = 0.5
         
@@ -60,38 +61,38 @@ class FoosballMARLEnv(gym.Env):
         else:
             self.client = p.connect(p.DIRECT)
         
-        # Observation space
+        # Observation space (utilise les limites globales maximales)
         self.observation_space = gym.spaces.Box(
             low=np.array([
                 -self.x_max, -self.y_max, -50, -50,  # Balle
-                self.slide_min, -np.pi,  # Agent 0
-                self.slide_min, -np.pi,  # Agent 1
-                self.slide_min, -np.pi,  # Agent 2
-                self.slide_min, -np.pi,  # Agent 3
-                self.slide_min, -np.pi,  # Rod 5
-                self.slide_min, -np.pi,  # Rod 6
-                self.slide_min, -np.pi,  # Rod 7
-                self.slide_min, -np.pi,  # Rod 8
+                self.slide_min_global, -np.pi,  # Agent 0
+                self.slide_min_global, -np.pi,  # Agent 1
+                self.slide_min_global, -np.pi,  # Agent 2
+                self.slide_min_global, -np.pi,  # Agent 3
+                self.slide_min_global, -np.pi,  # Rod 5
+                self.slide_min_global, -np.pi,  # Rod 6
+                self.slide_min_global, -np.pi,  # Rod 7
+                self.slide_min_global, -np.pi,  # Rod 8
             ], dtype=np.float32),
             high=np.array([
                 self.x_max, self.y_max, 50, 50,
-                self.slide_max, np.pi,
-                self.slide_max, np.pi,
-                self.slide_max, np.pi,
-                self.slide_max, np.pi,
-                self.slide_max, np.pi,
-                self.slide_max, np.pi,
-                self.slide_max, np.pi,
-                self.slide_max, np.pi,
+                self.slide_max_global, np.pi,
+                self.slide_max_global, np.pi,
+                self.slide_max_global, np.pi,
+                self.slide_max_global, np.pi,
+                self.slide_max_global, np.pi,
+                self.slide_max_global, np.pi,
+                self.slide_max_global, np.pi,
+                self.slide_max_global, np.pi,
             ], dtype=np.float32),
             dtype=np.float32
         )
         
-        # Action space
+        # Action space (utilise les limites globales maximales pour uniformité)
         self.action_space = gym.spaces.Dict({
             f"agent_{i}": gym.spaces.Box(
-                low=np.array([self.slide_min, -np.pi], dtype=np.float32),
-                high=np.array([self.slide_max, np.pi], dtype=np.float32),
+                low=np.array([self.slide_min_global, -np.pi], dtype=np.float32),
+                high=np.array([self.slide_max_global, np.pi], dtype=np.float32),
                 shape=(2,),
                 dtype=np.float32
             ) for i in range(4)
@@ -112,6 +113,15 @@ class FoosballMARLEnv(gym.Env):
         # Lignes de but
         self.goal_line_left = -0.75
         self.goal_line_right = 0.75
+        
+        # Limites du plateau (pour détecter sortie de balle)
+        # Basé sur URDF: table 1.5m × 0.68m, murs à ±0.365
+        self.table_x_min = -0.80  # Un peu avant la ligne de but
+        self.table_x_max = 0.80
+        self.table_y_min = -0.40  # Limites Y du terrain (±0.365 + marge)
+        self.table_y_max = 0.40
+        self.table_z_min = 0.48   # Hauteur minimale (table à 0.5, balle ne doit pas être en dessous)
+        self.table_z_max = 0.80   # Hauteur maximale (balle peut rebondir haut)
         
         # Physique
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
@@ -163,6 +173,30 @@ class FoosballMARLEnv(gym.Env):
             print(f"❌ Erreur dans _get_observation: {e}")
             return np.zeros(20, dtype=np.float32)
 
+    def _is_ball_out_of_bounds(self) -> bool:
+        """
+        Vérifie si la balle est sortie du plateau
+        
+        Returns:
+            True si la balle est hors limites, False sinon
+        """
+        try:
+            ball_pos, _ = p.getBasePositionAndOrientation(self.ball_id)
+            ball_x, ball_y, ball_z = ball_pos
+            
+            # Vérifier si la balle est hors des limites X, Y ou Z
+            out_of_bounds = (
+                ball_x < self.table_x_min or ball_x > self.table_x_max or
+                ball_y < self.table_y_min or ball_y > self.table_y_max or
+                ball_z < self.table_z_min or ball_z > self.table_z_max
+            )
+            
+            return out_of_bounds
+        
+        except Exception as e:
+            print(f"❌ Erreur dans _is_ball_out_of_bounds: {e}")
+            return False
+    
     def _get_opponent_observation(self, opponent_id: int) -> np.ndarray:
         """
         Observation miroir pour Team2
@@ -302,9 +336,10 @@ class SelfPlayFoosballEnv(MultiAgentEnv):
         single_obs_space = gym.spaces.Box(
             low=-np.inf, high=np.inf, shape=(20,), dtype=np.float32
         )
+        # Action space utilise les limites maximales (±0.18 pour compatibilité avec toutes les barres)
         single_action_space = gym.spaces.Box(
-            low=np.array([-0.1, -np.pi], dtype=np.float32),
-            high=np.array([0.1, np.pi], dtype=np.float32),
+            low=np.array([-0.18, -np.pi], dtype=np.float32),
+            high=np.array([0.18, np.pi], dtype=np.float32),
             dtype=np.float32
         )
         
@@ -338,7 +373,8 @@ class SelfPlayFoosballEnv(MultiAgentEnv):
             action = action_dict[f"agent_{agent_id}"]
             config = self.base_env.agent_configs[agent_id]
             
-            target_slide = np.clip(float(action[0]), self.base_env.slide_min, self.base_env.slide_max)
+            # Utiliser les limites spécifiques à chaque barre
+            target_slide = np.clip(float(action[0]), config["slide_min"], config["slide_max"])
             target_rotation = np.clip(float(action[1]), -np.pi, np.pi)
             
             p.setJointMotorControl2(
@@ -364,7 +400,8 @@ class SelfPlayFoosballEnv(MultiAgentEnv):
             action = action_dict[f"agent_{opponent_id+4}"]
             opp_config = self.base_env.opponent_joints[opponent_id]
             
-            target_slide = np.clip(float(action[0]), self.base_env.slide_min, self.base_env.slide_max)
+            # Utiliser les limites spécifiques à chaque barre
+            target_slide = np.clip(float(action[0]), opp_config["slide_min"], opp_config["slide_max"])
             target_rotation = np.clip(float(action[1]), -np.pi, np.pi)
             
             p.setJointMotorControl2(
@@ -418,17 +455,37 @@ class SelfPlayFoosballEnv(MultiAgentEnv):
         
         # Terminaison
         goal_scored = False
-        if ball_x >= self.base_env.goal_line_right:
+        ball_out = False
+        
+        # Vérifier si la balle est sortie du plateau
+        if self.base_env._is_ball_out_of_bounds():
+            ball_out = True
+            # Pénalité pour sortie de balle (aucune équipe ne marque)
+            for i in range(8):
+                rewards[f"agent_{i}"] = -5.0  # Pénalité pour tous
+        # Vérifier les buts
+        elif ball_x >= self.base_env.goal_line_right:
             self.base_env.team1_goals += 1
             goal_scored = True
+            # Bonus pour but marqué
+            for i in range(4):
+                rewards[f"agent_{i}"] += 10.0  # Team1 marque
+                rewards[f"agent_{i+4}"] -= 10.0  # Team2 encaisse
         elif ball_x <= self.base_env.goal_line_left:
             self.base_env.team2_goals += 1
             goal_scored = True
+            # Bonus pour but marqué
+            for i in range(4):
+                rewards[f"agent_{i}"] -= 10.0  # Team1 encaisse
+                rewards[f"agent_{i+4}"] += 10.0  # Team2 marque
         
         truncated = self.base_env.current_step >= self.base_env.max_steps
         
-        dones = {f"agent_{i}": goal_scored or truncated for i in range(8)}
-        dones["__all__"] = goal_scored or truncated
+        # Episode terminé si: but marqué OU balle sortie OU max steps
+        episode_done = goal_scored or ball_out or truncated
+        
+        dones = {f"agent_{i}": episode_done for i in range(8)}
+        dones["__all__"] = episode_done
         
         self.base_env.previous_ball_x = ball_x
         
@@ -461,7 +518,6 @@ def train_selfplay_rllib(num_iterations: int = 100,
     """
     import ray
     from ray.rllib.algorithms.ppo import PPOConfig
-    from ray.rllib.policy.policy import PolicySpec
     
     # Check for lz4
     try:
@@ -471,11 +527,12 @@ def train_selfplay_rllib(num_iterations: int = 100,
         print("")
     
     print("=" * 70)
-    print("ENTRAÎNEMENT SELF-PLAY RLLIB - 8 AGENTS (4v4)")
+    print("ENTRAÎNEMENT SELF-PLAY RLLIB - 8 AGENTS (4v4) + LSTM")
     print("=" * 70)
     print(f"Itérations: {num_iterations}")
     print(f"Workers: {num_workers}")
     print(f"Render: {'OUI (lent)' if render else 'NON (rapide)'}")
+    print(f"Architecture: FC[256,256] → LSTM[256] → Policy/Value")
     print(f"NOTE: Les 8 agents utilisent la MÊME politique (self-play)")
     print("=" * 70)
     
@@ -496,64 +553,95 @@ def train_selfplay_rllib(num_iterations: int = 100,
     logging.getLogger("ray.rllib").setLevel(logging.ERROR)
     logging.getLogger("ray.tune").setLevel(logging.ERROR)
     
-    ray.init(ignore_reinit_error=True, num_cpus=num_workers+1, logging_level=logging.ERROR)
+    ray.init(
+        ignore_reinit_error=True, 
+        num_cpus=num_workers+1, 
+        logging_level=logging.ERROR,
+        _metrics_export_port=None,  # Disable metrics exporter
+        _system_config={
+            "metrics_report_interval_ms": 0,  # Disable metrics reporting
+        }
+    )
     
-    # UNE SEULE politique pour les 8 agents
+    # Avec la nouvelle API stack, on définit juste le policy mapping
+    # Les politiques sont créées automatiquement par RLlib
+    def policy_mapping_fn(agent_id, episode, **kwargs):
+        # Tous les agents partagent la même politique
+        return "default_policy"
+    
+    # Configuration PPO
+    env_config = {"render": render} if render else {}
+    
+    # Configuration du modèle LSTM pour la nouvelle API stack
+    model_config = {
+        "fcnet_hiddens": [256, 256],  # Couches FC avant LSTM
+        "fcnet_activation": "relu",
+        "use_lstm": True,  # Activer LSTM
+        "lstm_cell_size": 256,  # Taille des cellules LSTM
+        "max_seq_len": 20,  # Longueur maximale de séquence
+        "lstm_use_prev_action": True,  # Utiliser l'action précédente
+        "lstm_use_prev_reward": True,  # Utiliser la récompense précédente
+    }
+    
+    # Avec l'ancienne API pour compatibilité multi-agent + LSTM
+    from ray.rllib.policy.policy import PolicySpec
+    
+    # Définir la politique avec LSTM
     policies = {
         "shared_policy": PolicySpec(
             observation_space=gym.spaces.Box(
                 low=-np.inf, high=np.inf, shape=(20,), dtype=np.float32
             ),
             action_space=gym.spaces.Box(
-                low=np.array([-0.1, -np.pi], dtype=np.float32),
-                high=np.array([0.1, np.pi], dtype=np.float32),
+                low=np.array([-0.18, -np.pi], dtype=np.float32),
+                high=np.array([0.18, np.pi], dtype=np.float32),
                 dtype=np.float32
             ),
+            config={
+                "model": model_config,
+            }
         ),
     }
     
-    def policy_mapping_fn(agent_id, episode, **kwargs):
+    def policy_mapping_fn_old(agent_id, episode, worker, **kwargs):
         return "shared_policy"
-    
-    # Configuration PPO
-    env_config = {"render": render} if render else {}
     
     config = (
         PPOConfig()
         .environment(SelfPlayFoosballEnv, env_config=env_config)
         .framework("torch")
-        # Explicitly use new API stack (suppresses warnings)
+        # Utiliser ancienne API pour multi-agent + LSTM
         .api_stack(
-            enable_rl_module_and_learner=True,
-            enable_env_runner_and_connector_v2=True,
+            enable_rl_module_and_learner=False,
+            enable_env_runner_and_connector_v2=False,
         )
-        .experimental(_disable_preprocessor_api=True)
         .training(
             lr=3e-4,
             gamma=0.99,
             lambda_=0.95,
             clip_param=0.2,
             train_batch_size=4000,
-            minibatch_size=128,
-            num_epochs=10,  # Renamed from num_sgd_iter
+            num_sgd_iter=10,
+            model=model_config,  # Configuration LSTM
         )
         .multi_agent(
             policies=policies,
-            policy_mapping_fn=policy_mapping_fn,
+            policy_mapping_fn=policy_mapping_fn_old,
         )
         .env_runners(
-            num_env_runners=1 if render else num_workers,  # 1 worker si render
+            num_env_runners=1 if render else num_workers,
             num_envs_per_env_runner=1,
         )
         .resources(
             num_gpus=0,
         )
         .debugging(
-            log_level="ERROR"  # Reduce noise
+            log_level="ERROR"
         )
     )
     
-    print("\n  ✓ 1 politique partagée pour les 8 agents")
+    print("\n  ✓ Politique partagée pour les 8 agents (self-play)")
+    print("  ✓ Configuration: Nouvelle API stack avec LSTM")
     if render:
         print(f"  ⚠️  Mode VISUALISATION : 1 worker (lent)")
     else:
@@ -561,7 +649,7 @@ def train_selfplay_rllib(num_iterations: int = 100,
     
     # Construire
     print("\n[Construction PPO...]")
-    algo = config.build_algo()
+    algo = config.build()
     print("  ✓ Algorithme prêt\n")
     
     # Entraînement
@@ -569,18 +657,54 @@ def train_selfplay_rllib(num_iterations: int = 100,
     print(f"DÉMARRAGE ({num_iterations} itérations)")
     print("=" * 70)
     
+    import time
+    start_time = time.time()
+    
     try:
         for i in range(num_iterations):
+            iter_start = time.time()
             result = algo.train()
+            iter_time = time.time() - iter_start
             
-            if i % 10 == 0:
-                print(f"\n📊 Itération {i+1}/{num_iterations}")
-                print(f"  Reward mean: {result['env_runners']['episode_reward_mean']:.2f}")
-                print(f"  Episode length: {result['env_runners']['episode_len_mean']:.1f}")
+            # Barre de progression
+            progress = (i + 1) / num_iterations
+            bar_length = 50
+            filled = int(bar_length * progress)
+            bar = "█" * filled + "░" * (bar_length - filled)
             
+            # Temps estimé restant
+            elapsed = time.time() - start_time
+            if i > 0:
+                avg_time_per_iter = elapsed / (i + 1)
+                remaining_iters = num_iterations - (i + 1)
+                eta_seconds = avg_time_per_iter * remaining_iters
+                eta_minutes = int(eta_seconds / 60)
+                eta_hours = eta_minutes // 60
+                eta_mins = eta_minutes % 60
+                
+                if eta_hours > 0:
+                    eta_str = f"{eta_hours}h{eta_mins:02d}m"
+                else:
+                    eta_str = f"{eta_mins}m"
+            else:
+                eta_str = "calculant..."
+            
+            # Affichage compact avec barre
+            reward = result['env_runners']['episode_reward_mean']
+            ep_len = result['env_runners']['episode_len_mean']
+            
+            print(f"\r[{bar}] {i+1}/{num_iterations} ({progress*100:.1f}%) | "
+                  f"Reward: {reward:>7.2f} | Len: {ep_len:>6.1f} | "
+                  f"ETA: {eta_str:<8} | {iter_time:.1f}s/iter", end="", flush=True)
+            
+            # Affichage détaillé tous les 10 iterations
+            if (i + 1) % 10 == 0 or i == 0:
+                print()  # Nouvelle ligne
+            
+            # Checkpoint
             if (i + 1) % checkpoint_freq == 0:
                 checkpoint_dir = algo.save()
-                print(f"  💾 Checkpoint: {checkpoint_dir}")
+                print(f"\n  💾 Checkpoint sauvegardé: ...{checkpoint_dir[-40:]}")
         
         print("\n" + "=" * 70)
         print("✓ ENTRAÎNEMENT TERMINÉ!")
