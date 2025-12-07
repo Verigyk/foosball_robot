@@ -553,15 +553,46 @@ def train_selfplay_rllib(num_iterations: int = 100,
     logging.getLogger("ray.rllib").setLevel(logging.ERROR)
     logging.getLogger("ray.tune").setLevel(logging.ERROR)
     
-    ray.init(
-        ignore_reinit_error=True, 
-        num_cpus=num_workers+1, 
-        logging_level=logging.ERROR,
-        _metrics_export_port=None,  # Disable metrics exporter
-        _system_config={
-            "metrics_report_interval_ms": 0,  # Disable metrics reporting
-        }
-    )
+    # Nettoyer les variables d'environnement Ray qui pourraient pointer vers un cluster distant
+    for env_var in ["RAY_ADDRESS", "RAY_HEAD_SERVICE_IP", "RAY_HEAD_SERVICE_PORT"]:
+        if env_var in os.environ:
+            del os.environ[env_var]
+            print(f"  ✓ Variable d'environnement {env_var} supprimée")
+    
+    # Tenter de se connecter à un cluster existant ou en créer un nouveau
+    try:
+        ray.init(
+            address="local",  # Force l'utilisation d'un cluster local
+            ignore_reinit_error=True, 
+            num_cpus=num_workers+1, 
+            logging_level=logging.ERROR,
+            _metrics_export_port=None,  # Disable metrics exporter
+            _system_config={
+                "metrics_report_interval_ms": 0,  # Disable metrics reporting
+            },
+            # Configurations supplémentaires pour éviter les problèmes de connexion
+            _temp_dir=None,  # Utiliser le répertoire temporaire par défaut
+            include_dashboard=False,  # Désactiver le dashboard pour réduire les ressources
+        )
+        print("  ✓ Ray initialisé avec succès")
+    except Exception as e:
+        print(f"  ⚠️  Erreur lors de l'initialisation de Ray: {e}")
+        print("  → Tentative d'arrêt des processus Ray existants...")
+        os.system("ray stop --force")
+        time.sleep(2)
+        print("  → Nouvelle tentative d'initialisation...")
+        ray.init(
+            address="local",
+            ignore_reinit_error=True, 
+            num_cpus=num_workers+1, 
+            logging_level=logging.ERROR,
+            _metrics_export_port=None,
+            _system_config={
+                "metrics_report_interval_ms": 0,
+            },
+            include_dashboard=False,
+        )
+        print("  ✓ Ray initialisé après nettoyage")
     
     # Avec la nouvelle API stack, on définit juste le policy mapping
     # Les politiques sont créées automatiquement par RLlib

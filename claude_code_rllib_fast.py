@@ -239,13 +239,28 @@ def train_fast(
         except:
             print("⚠️  PyTorch GPU non disponible")
     
+    # Nettoyer les variables d'environnement Ray qui pourraient pointer vers un cluster distant
+    for env_var in ["RAY_ADDRESS", "RAY_HEAD_SERVICE_IP", "RAY_HEAD_SERVICE_PORT"]:
+        if env_var in os.environ:
+            del os.environ[env_var]
+            print(f"  ✓ Variable d'environnement {env_var} supprimée")
+    
+    # Tenter d'arrêter tout cluster Ray existant
+    try:
+        os.system("ray stop --force > /dev/null 2>&1")
+        time.sleep(1)
+    except:
+        pass
+    
     ray.init(
+        address="local",  # Force l'utilisation d'un cluster local
         ignore_reinit_error=True,
         num_cpus=num_workers+1,
         num_gpus=num_gpus,
         logging_level=logging.ERROR,
         _metrics_export_port=None,
-        _system_config={"metrics_report_interval_ms": 0}
+        _system_config={"metrics_report_interval_ms": 0},
+        include_dashboard=False,
     )
     
     # Configuration modèle
