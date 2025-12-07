@@ -541,7 +541,7 @@ def pretrain_agent(agent_id: int, phase: TrainingPhase, timesteps: int = 100000,
         render: Afficher la simulation (GUI visible)
     """
     from stable_baselines3 import PPO
-    from stable_baselines3.common.vec_env import DummyVecEnv, VecVideoRecorder
+    from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecVideoRecorder
     from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback
     from stable_baselines3.common.monitor import Monitor
     
@@ -564,7 +564,7 @@ def pretrain_agent(agent_id: int, phase: TrainingPhase, timesteps: int = 100000,
         env = DummyVecEnv([make_env])
         print("🎨 Mode VISUALISATION activé (1 environnement)")
     else:
-        env = DummyVecEnv([make_env for _ in range(4)])
+        env = SubprocVecEnv([make_env for _ in range(4)])
         print("⚡ Mode RAPIDE activé (4 environnements parallèles)")
     
     # Callbacks
