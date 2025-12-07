@@ -694,7 +694,7 @@ class FoosballPreTrainingEnv(gym.Env):
 # =============================================================================
 
 def pretrain_agent(agent_id: int, phase: TrainingPhase, timesteps: int = 100000, 
-                   model_name: str = None, render: bool = False):
+                   model_name: str = None, render: bool = False, num_envs: int = 4):
     """
     Pré-entraîne un agent sur une phase spécifique
     
@@ -704,6 +704,7 @@ def pretrain_agent(agent_id: int, phase: TrainingPhase, timesteps: int = 100000,
         timesteps: Nombre de timesteps d'entraînement
         model_name: Nom pour sauvegarder le modèle (optionnel)
         render: Afficher la simulation (GUI visible)
+        num_envs: Nombre d'environnements parallèles (ignoré si render=True)
     """
     from stable_baselines3 import PPO
     from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecVideoRecorder
@@ -724,13 +725,13 @@ def pretrain_agent(agent_id: int, phase: TrainingPhase, timesteps: int = 100000,
         return env
     
     # Si render=True, utiliser seulement 1 environnement pour visualiser
-    # Sinon, utiliser 4 environnements parallèles pour accélérer
+    # Sinon, utiliser num_envs environnements parallèles pour accélérer
     if render:
         env = DummyVecEnv([make_env])
         print("🎨 Mode VISUALISATION activé (1 environnement)")
     else:
-        env = SubprocVecEnv([make_env for _ in range(4)])
-        print("⚡ Mode RAPIDE activé (4 environnements parallèles)")
+        env = SubprocVecEnv([make_env for _ in range(num_envs)])
+        print(f"⚡ Mode RAPIDE activé ({num_envs} environnements parallèles)")
     
     # Callbacks
     if model_name is None:
@@ -752,11 +753,20 @@ def pretrain_agent(agent_id: int, phase: TrainingPhase, timesteps: int = 100000,
     print(f"  Phase: {phase.value}")
     print(f"  Max steps par épisode: {max_steps}")
     
+    # Calculer n_steps pour que n_steps * num_envs = 16384
+    total_steps_target = 16384
+    n_steps_per_env = total_steps_target // num_envs
+    actual_total_steps = n_steps_per_env * num_envs
+    
+    print(f"  Environnements parallèles: {num_envs}")
+    print(f"  Steps par environnement: {n_steps_per_env}")
+    print(f"  Total steps collectés: {actual_total_steps}")
+    
     model = PPO(
         "MlpPolicy",
         env,
         learning_rate=3e-4,
-        n_steps=2048,
+        n_steps=n_steps_per_env,
         batch_size=64,
         n_epochs=100,
         gamma=0.99,
@@ -814,7 +824,7 @@ def pretrain_agent(agent_id: int, phase: TrainingPhase, timesteps: int = 100000,
         env.close()
 
 
-def pretrain_all_agents(defense_timesteps: int = 100000, attack_timesteps: int = 100000, render: bool = False):
+def pretrain_all_agents(defense_timesteps: int = 100000, attack_timesteps: int = 100000, render: bool = False, num_envs: int = 4):
     """
     Pré-entraîne tous les 4 agents séquentiellement
     
@@ -828,6 +838,7 @@ def pretrain_all_agents(defense_timesteps: int = 100000, attack_timesteps: int =
         defense_timesteps: Nombre de timesteps pour chaque entraînement défense
         attack_timesteps: Nombre de timesteps pour chaque entraînement attaque
         render: Afficher la visualisation pendant l'entraînement
+        num_envs: Nombre d'environnements parallèles (ignoré si render=True)
     """
     from stable_baselines3 import PPO
     from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
@@ -840,6 +851,7 @@ def pretrain_all_agents(defense_timesteps: int = 100000, attack_timesteps: int =
     print(f"Defense timesteps: {defense_timesteps}")
     print(f"Attack timesteps: {attack_timesteps}")
     print(f"Visualisation: {'OUI (lent)' if render else 'NON (rapide)'}")
+    print(f"Environnements parallèles: {num_envs if not render else 1}")
     print(f"NOTE: Le même modèle est utilisé pour défense et attaque")
     print("=" * 70)
     
@@ -861,7 +873,8 @@ def pretrain_all_agents(defense_timesteps: int = 100000, attack_timesteps: int =
             agent_id=agent_id,
             phase=TrainingPhase.DEFENSE,
             timesteps=defense_timesteps,
-            render=render
+            render=render,
+            num_envs=num_envs
         )
         models[f"agent{agent_id}_defense"] = defense_model
         
@@ -887,11 +900,27 @@ def pretrain_all_agents(defense_timesteps: int = 100000, attack_timesteps: int =
             attack_env = DummyVecEnv([make_attack_env])
             print("🎨 Mode VISUALISATION activé (1 environnement)")
         else:
-            attack_env = SubprocVecEnv([make_attack_env for _ in range(4)])
-            print("⚡ Mode RAPIDE activé (4 environnements parallèles)")
+            attack_env = SubprocVecEnv([make_attack_env for _ in range(num_envs)])
+            print(f"⚡ Mode RAPIDE activé ({num_envs} environnements parallèles)")
         
         # Changer l'environnement du modèle existant
         defense_model.set_env(attack_env)
+        
+        # Recalculer n_steps pour l'environnement d'attaque
+        # PPO doit être reconfiguré avec le nouveau n_steps
+        total_steps_target = 16384
+        n_steps_per_env = total_steps_target // num_envs
+        actual_total_steps = n_steps_per_env * num_envs
+        
+        print(f"Reconfiguration PPO pour l'attaque:")
+        print(f"  Environnements parallèles: {num_envs}")
+        print(f"  Steps par environnement: {n_steps_per_env}")
+        print(f"  Total steps collectés: {actual_total_steps}")
+        
+        # Mettre à jour n_steps dans le modèle
+        defense_model.n_steps = n_steps_per_env
+        defense_model.rollout_buffer.buffer_size = n_steps_per_env
+        defense_model.rollout_buffer.reset()
         
         # Callbacks pour l'attaque
         model_name = f"agent{agent_id}_attack"
@@ -1024,12 +1053,20 @@ if __name__ == "__main__":
             defense_steps = int(sys.argv[2]) if len(sys.argv) > 2 else 100000
             attack_steps = int(sys.argv[3]) if len(sys.argv) > 3 else 100000
             render = "--render" in sys.argv or "-r" in sys.argv
-            pretrain_all_agents(defense_steps, attack_steps, render=render)
+            
+            # Extraire num_envs depuis les arguments
+            num_envs = 4  # Valeur par défaut
+            for i, arg in enumerate(sys.argv):
+                if arg == "--num-envs" and i + 1 < len(sys.argv):
+                    num_envs = int(sys.argv[i + 1])
+                    break
+            
+            pretrain_all_agents(defense_steps, attack_steps, render=render, num_envs=num_envs)
         
         elif command == "train":
             # Entraîner un agent spécifique
             if len(sys.argv) < 4:
-                print("Usage: python script.py train <agent_id> <defense|attack> [timesteps] [--render]")
+                print("Usage: python script.py train <agent_id> <defense|attack> [timesteps] [--render] [--num-envs N]")
                 sys.exit(1)
             
             agent_id = int(sys.argv[2])
@@ -1038,7 +1075,14 @@ if __name__ == "__main__":
             timesteps = int(sys.argv[4]) if len(sys.argv) > 4 and sys.argv[4].isdigit() else 100000
             render = "--render" in sys.argv or "-r" in sys.argv
             
-            pretrain_agent(agent_id, phase, timesteps, render=render)
+            # Extraire num_envs depuis les arguments
+            num_envs = 4  # Valeur par défaut
+            for i, arg in enumerate(sys.argv):
+                if arg == "--num-envs" and i + 1 < len(sys.argv):
+                    num_envs = int(sys.argv[i + 1])
+                    break
+            
+            pretrain_agent(agent_id, phase, timesteps, render=render, num_envs=num_envs)
         
         elif command == "test":
             # Tester un agent
@@ -1056,13 +1100,17 @@ if __name__ == "__main__":
         
         else:
             print("Commandes disponibles:")
-            print("  train_all [defense_steps] [attack_steps] [--render]  - Entraîner tous les agents")
-            print("  train <agent_id> <defense|attack> [steps] [--render] - Entraîner un agent spécifique")
-            print("  test <agent_id> <defense|attack> <model>             - Tester un agent")
+            print("  train_all [defense_steps] [attack_steps] [--render] [--num-envs N]  - Entraîner tous les agents")
+            print("  train <agent_id> <defense|attack> [steps] [--render] [--num-envs N] - Entraîner un agent spécifique")
+            print("  test <agent_id> <defense|attack> <model>                             - Tester un agent")
+            print("\nOptions:")
+            print("  --render         Afficher la visualisation (lent, 1 environnement)")
+            print("  --num-envs N     Nombre d'environnements parallèles (défaut: 4, ignoré si --render)")
             print("\nExemples:")
-            print("  python script.py train 0 defense 50000 --render     # Voir l'entraînement en direct")
-            print("  python script.py train 1 attack 100000              # Entraînement rapide sans GUI")
-            print("  python script.py train_all 50000 50000 --render     # Tout voir (très lent)")
+            print("  python script.py train 0 defense 50000 --render                # Voir l'entraînement en direct")
+            print("  python script.py train 1 attack 100000 --num-envs 8            # Entraînement rapide avec 8 envs")
+            print("  python script.py train_all 50000 50000 --num-envs 2            # Entraînement avec 2 envs")
+            print("  python script.py train 0 defense 100000 --num-envs 16          # Maximum de parallélisme")
             sys.exit(1)
     
     else:
