@@ -411,6 +411,7 @@ def train_fast(
 
 if __name__ == "__main__":
     import sys
+    import argparse
     
     # Détecter GPU
     use_gpu = False
@@ -423,16 +424,22 @@ if __name__ == "__main__":
     # Détecter nombre de cores
     import os
     num_cores = os.cpu_count() or 4
-    num_workers = max(2, min(num_cores - 4, 12))  # Entre 2 et 12
+    num_workers_default = max(2, min(num_cores - 4, 12))  # Entre 2 et 12
     
     if len(sys.argv) > 1:
         command = sys.argv[1]
         
-        # Détecter --render flag
+        # Parser les arguments
         render = False
-        for arg in sys.argv:
+        num_workers = num_workers_default
+        
+        for i, arg in enumerate(sys.argv):
             if arg == "--render" or arg == "-r":
                 render = True
+            elif arg in ["--workers", "-w", "--threads", "-t"]:
+                if i + 1 < len(sys.argv) and sys.argv[i + 1].isdigit():
+                    num_workers = int(sys.argv[i + 1])
+                    print(f"✓ Nombre de threads/workers défini: {num_workers}")
         
         if command == "fast":
             # Mode rapide: feedforward + fast physics
@@ -477,17 +484,19 @@ if __name__ == "__main__":
         
         else:
             print("Usage:")
-            print("  python claude_code_rllib_fast.py fast [iterations] [--render]    # Mode rapide")
-            print("  python claude_code_rllib_fast.py lstm [iterations] [--render]    # Mode LSTM")
-            print("  python claude_code_rllib_fast.py quality [iterations] [--render] # Mode qualité")
+            print("  python claude_code_rllib_fast.py fast [iterations] [options]    # Mode rapide")
+            print("  python claude_code_rllib_fast.py lstm [iterations] [options]    # Mode LSTM")
+            print("  python claude_code_rllib_fast.py quality [iterations] [options] # Mode qualité")
             print("")
             print("Options:")
-            print("  --render, -r    Afficher la simulation (TRÈS lent)")
+            print("  --render, -r              Afficher la simulation (TRÈS lent)")
+            print("  --threads N, -t N         Nombre de threads/workers parallèles")
+            print("  --workers N, -w N         Alias pour --threads")
             print("")
             print("Exemples:")
             print("  python claude_code_rllib_fast.py fast 50")
-            print("  python claude_code_rllib_fast.py lstm 100")
-            print("  python claude_code_rllib_fast.py quality 100")
+            print("  python claude_code_rllib_fast.py lstm 100 --threads 8")
+            print("  python claude_code_rllib_fast.py quality 100 -t 4")
             print("  python claude_code_rllib_fast.py fast 10 --render  # Avec visualisation")
     else:
         print("="*70)
@@ -500,25 +509,28 @@ if __name__ == "__main__":
         print("  quality - LSTM 256 + Physique réaliste (qualité max)")
         print("")
         print("Usage:")
-        print("  python claude_code_rllib_fast.py <mode> [iterations] [--render]")
+        print("  python claude_code_rllib_fast.py <mode> [iterations] [options]")
         print("")
         print("Options:")
-        print("  --render, -r    Afficher la simulation PyBullet (TRÈS lent)")
-        print("                  Utilise 1 worker au lieu de plusieurs")
+        print("  --render, -r              Afficher la simulation PyBullet (TRÈS lent)")
+        print("                            Utilise 1 worker au lieu de plusieurs")
+        print("  --threads N, -t N         Nombre de threads/workers parallèles")
+        print("  --workers N, -w N         Alias pour --threads")
         print("")
         print("Exemples:")
         print("  python claude_code_rllib_fast.py fast 50          # Rapide")
         print("  python claude_code_rllib_fast.py lstm 100         # Recommandé")
         print("  python claude_code_rllib_fast.py quality 100      # Qualité")
         print("  python claude_code_rllib_fast.py fast 10 --render # Avec GUI")
+        print("  python claude_code_rllib_fast.py lstm 100 -t 8    # 8 threads")
         print("")
         print(f"Configuration détectée:")
         print(f"  CPU cores: {num_cores}")
-        print(f"  Workers suggérés: {num_workers}")
+        print(f"  Workers par défaut: {num_workers_default}")
         print(f"  GPU disponible: {'OUI' if use_gpu else 'NON'}")
         print("")
-        print("💡 Note sur --render:")
-        print("  - Affiche PyBullet GUI en temps réel")
-        print("  - BEAUCOUP plus lent (1 worker seulement)")
-        print("  - Recommandé pour observer, pas pour entraîner")
-        print("  - Utiliser avec peu d'iterations (5-10)")
+        print("💡 Notes:")
+        print("  - Par défaut utilise (cores - 4) threads, max 12")
+        print("  - --render force 1 thread (affichage temps réel)")
+        print("  - Plus de threads = plus rapide (jusqu'à saturation CPU)")
+        print("  - Recommandé: 4-8 threads pour la plupart des machines")
