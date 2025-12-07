@@ -15,3 +15,13 @@ pretraining_tensorboard/agent0_defense/PPO_6/events.out.tfevents.1765079574.LAPT
 pretraining_tensorboard/agent0_defense/PPO_7/events.out.tfevents.1765080616.LAPTOP-VNSUPAIF.11588.0
 pretraining_tensorboard/agent0_defense/PPO_8/events.out.tfevents.1765081781.LAPTOP-VNSUPAIF.18664.0
 pretraining_tensorboard/agent0_defense/PPO_9/events.out.tfevents.1765081859.LAPTOP-VNSUPAIF.19479.0
+RESOLUTION_SUMMARY.md
+WARNINGS_RESOLVED.md
+__pycache__/claude_code_rllib.cpython-312.pyc
+pretraining_models/agent0_combined_final.zip
+pretraining_models/agent0_defense_final.zip
+pretraining_models/agent1_combined_final.zip
+pretraining_tensorboard/agent0_defense/PPO_10/events.out.tfevents.1765083679.LAPTOP-VNSUPAIF.24833.0
+pretraining_tensorboard/agent0_defense/PPO_11/events.out.tfevents.1765092407.LAPTOP-VNSUPAIF.38603.0
+pretraining_tensorboard/agent0_defense/PPO_12/events.out.tfevents.1765092913.LAPTOP-VNSUPAIF.40837.0
+pretraining_tensorboard/agent0_defense/PPO_13/events.out.tfevents.1765093307.LAPTOP-VNSUPAIF.42442.0
