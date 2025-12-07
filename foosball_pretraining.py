@@ -579,9 +579,9 @@ def pretrain_agent(agent_id: int, phase: TrainingPhase, timesteps: int = 100000,
     
     # Créer le modèle
     print(f"\n[1/3] Création du modèle PPO pour l'agent {agent_id}...")
-    
-    agent_name = env.envs[0].agent_configs[agent_id]['name']
-    max_steps = env.envs[0].max_steps
+
+    agent_name = env.get_attr("agent_configs")[0][agent_id]['name']
+    max_steps = env.get_attr("max_steps")[0]
 
     print(f"  Rôle: {agent_name}")
     print(f"  Phase: {phase.value}")
