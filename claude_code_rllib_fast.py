@@ -208,6 +208,7 @@ def train_fast(
     from ray.rllib.algorithms.ppo import PPOConfig
     from ray.rllib.policy.policy import PolicySpec
     import os
+    import time
     import warnings
     import logging
     

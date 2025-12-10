@@ -528,7 +528,7 @@ class FoosballPreTrainingEnv(gym.Env):
             controlMode=p.POSITION_CONTROL,
             targetPosition=target_rotation,
             force=200.0,
-            maxVelocity=30.0
+            maxVelocity=10.0
         )
         
         # Maintenir les autres agents en position inversée

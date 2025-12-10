@@ -37,16 +37,16 @@ class FoosballMARLEnv(gym.Env):
         self.agent_configs = {
             0: {"name": "Team1_Rod1_Goalie", "slide_idx": 2, "rotate_idx": 3, "x_pos": -0.625, "slide_min": -0.12, "slide_max": 0.12},
             1: {"name": "Team1_Rod2_Defense", "slide_idx": 7, "rotate_idx": 8, "x_pos": -0.45, "slide_min": -0.18, "slide_max": 0.18},
-            2: {"name": "Team1_Rod3_Forward", "slide_idx": 11, "rotate_idx": 12, "x_pos": -0.275, "slide_min": -0.12, "slide_max": 0.12},
-            3: {"name": "Team1_Rod4_Midfield", "slide_idx": 16, "rotate_idx": 17, "x_pos": -0.10, "slide_min": -0.08, "slide_max": 0.08},
+            2: {"name": "Team1_Rod3_Forward", "slide_idx": 16, "rotate_idx": 17, "x_pos": -0.10, "slide_min": -0.08, "slide_max": 0.08},
+            3: {"name": "Team1_Rod4_Midfield", "slide_idx": 30, "rotate_idx": 31, "x_pos": 0.275, "slide_min": -0.12, "slide_max": 0.12},
         }
         
         # Joints Team2 (rods 5-8, joints 23-40)
         self.opponent_joints = {
             0: {"name": "Team2_Rod8_Goalie", "slide_idx": 39, "rotate_idx": 40, "x_pos": 0.625, "slide_min": -0.12, "slide_max": 0.12},
             1: {"name": "Team2_Rod7_Defense", "slide_idx": 35, "rotate_idx": 36, "x_pos": 0.45, "slide_min": -0.18, "slide_max": 0.18},
-            2: {"name": "Team2_Rod6_Forward", "slide_idx": 30, "rotate_idx": 31, "x_pos": 0.275, "slide_min": -0.12, "slide_max": 0.12},
-            3: {"name": "Team2_Rod5_Midfield", "slide_idx": 23, "rotate_idx": 24, "x_pos": 0.10, "slide_min": -0.08, "slide_max": 0.08},
+            2: {"name": "Team2_Rod6_Forward", "slide_idx": 23, "rotate_idx": 24, "x_pos": 0.10, "slide_min": -0.08, "slide_max": 0.08},
+            3: {"name": "Team2_Rod5_Midfield", "slide_idx": 11, "rotate_idx": 12, "x_pos": -0.275, "slide_min": -0.12, "slide_max": 0.12},
         }
         
         # Limites globales pour observation space (valeurs maximales)
