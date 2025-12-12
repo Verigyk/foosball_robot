@@ -710,6 +710,8 @@ def pretrain_agent(agent_id: int, phase: TrainingPhase, timesteps: int = 100000,
     from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecVideoRecorder
     from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback
     from stable_baselines3.common.monitor import Monitor
+    from stable_baselines3.common.env_util import make_vec_env
+    from stable_baselines3.common.vec_env import SubprocVecEnv
     
     print("=" * 70)
     print(f"PRÉ-ENTRAÎNEMENT - Agent {agent_id} - Phase {phase.value.upper()}")
@@ -730,7 +732,14 @@ def pretrain_agent(agent_id: int, phase: TrainingPhase, timesteps: int = 100000,
         env = DummyVecEnv([make_env])
         print("🎨 Mode VISUALISATION activé (1 environnement)")
     else:
-        env = gym.vector.AsyncVectorEnv([make_env for _ in range(num_envs)], shared_memory=True, daemon=True, context="fork")
+        #env = gym.vector.AsyncVectorEnv([make_env for _ in range(num_envs)], shared_memory=True, daemon=True, context="fork")
+
+        env = make_vec_env(
+        make_env,
+        n_envs=num_envs,
+        vec_env_cls=SubprocVecEnv,
+        vec_env_kwargs=dict(start_method="fork")
+        )
         print(f"⚡ Mode RAPIDE activé ({num_envs} environnements parallèles)")
     
     # Callbacks
