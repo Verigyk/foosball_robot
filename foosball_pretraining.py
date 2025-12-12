@@ -707,7 +707,7 @@ def pretrain_agent(agent_id: int, phase: TrainingPhase, timesteps: int = 100000,
         num_envs: Nombre d'environnements parallèles (ignoré si render=True)
     """
     from stable_baselines3 import PPO
-    from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecVideoRecorder, AsyncVectorEnv
+    from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecVideoRecorder
     from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback
     from stable_baselines3.common.monitor import Monitor
     
