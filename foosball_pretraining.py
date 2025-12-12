@@ -730,7 +730,7 @@ def pretrain_agent(agent_id: int, phase: TrainingPhase, timesteps: int = 100000,
         env = DummyVecEnv([make_env])
         print("🎨 Mode VISUALISATION activé (1 environnement)")
     else:
-        env = AsyncVectorEnv([make_env for _ in range(num_envs)], shared_memory=True, daemon=True, context="fork")
+        env = gym.vector.AsyncVectorEnv([make_env for _ in range(num_envs)], shared_memory=True, daemon=True, context="fork")
         print(f"⚡ Mode RAPIDE activé ({num_envs} environnements parallèles)")
     
     # Callbacks
