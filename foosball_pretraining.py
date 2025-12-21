@@ -7,6 +7,8 @@ import time
 import torch
 from typing import Dict, Tuple, Literal
 from enum import Enum
+import random
+import math
 
 class TrainingPhase(Enum):
     """Phases de pré-entraînement"""
@@ -38,21 +40,21 @@ class FoosballPreTrainingEnv(gym.Env):
             self.max_steps = 200  # ~0.8 secondes (doit marquer rapidement)
         
         self.current_step = 0
-        
+
         # Configuration des barres Team1 (rods 1-4, joints 2-17)
         self.agent_configs = {
             0: {"name": "Team1_Rod1_Goalie", "slide_idx": 2, "rotate_idx": 3, "x_pos": -0.625},
             1: {"name": "Team1_Rod2_Defense", "slide_idx": 7, "rotate_idx": 8, "x_pos": -0.45},
-            2: {"name": "Team1_Rod3_Forward", "slide_idx": 11, "rotate_idx": 12, "x_pos": -0.275},
-            3: {"name": "Team1_Rod4_Midfield", "slide_idx": 16, "rotate_idx": 17, "x_pos": -0.10},
+            2: {"name": "Team1_Rod3_Forward", "slide_idx": 16, "rotate_idx": 17, "x_pos": -0.10},
+            3: {"name": "Team1_Rod4_Midfield", "slide_idx": 30, "rotate_idx": 31, "x_pos": 0.275},
         }
         
         # Joints de l'équipe adverse Team2 (rods 5-8, joints 23-40)
         self.opponent_joints = {
-            "rod5": {"slide_idx": 23, "rotate_idx": 24, "x_pos": 0.10},
-            "rod6": {"slide_idx": 30, "rotate_idx": 31, "x_pos": 0.275},
-            "rod7": {"slide_idx": 35, "rotate_idx": 36, "x_pos": 0.45},
-            "rod8": {"slide_idx": 39, "rotate_idx": 40, "x_pos": 0.625},
+            "rod5": {"slide_idx": 39, "rotate_idx": 40, "x_pos": 0.625},
+            "rod6": {"slide_idx": 35, "rotate_idx": 36, "x_pos": 0.45},
+            "rod7": {"slide_idx": 23, "rotate_idx": 24, "x_pos": 0.10},
+            "rod8": {"slide_idx": 11, "rotate_idx": 12, "x_pos": -0.275},
         }
         
         # Limites des actions
@@ -152,13 +154,15 @@ class FoosballPreTrainingEnv(gym.Env):
 
     def _lock_other_agents(self):
         """Met tous les autres agents en position inversée et verrouille Team2"""
+        #Generate random numbers
+
         for other_id, config in self.agent_configs.items():
             if other_id != self.agent_id:
                 p.setJointMotorControl2(
                     bodyIndex=self.table_id,
                     jointIndex=config["rotate_idx"],
                     controlMode=p.POSITION_CONTROL,
-                    targetPosition=np.pi,
+                    targetPosition=random.uniform(-np.pi, np.pi),
                     force=5000.0,
                     maxVelocity=100
                 )
@@ -166,7 +170,7 @@ class FoosballPreTrainingEnv(gym.Env):
                     bodyIndex=self.table_id,
                     jointIndex=config["slide_idx"],
                     controlMode=p.POSITION_CONTROL,
-                    targetPosition=0.0,
+                    targetPosition=random.uniform(self.slide_min, self.slide_max),
                     force=5000.0,
                     maxVelocity=100
                 )
@@ -252,7 +256,7 @@ class FoosballPreTrainingEnv(gym.Env):
             goes_to_goal = np.random.random() < 0.8
             
             if agent_x < 0:
-                ball_start_x = np.random.uniform(0.3, 0.6)
+                ball_start_x = np.random.uniform(max(0.3, self.agent_configs[self.agent_id]["x_pos"] + 1), 0.6)
                 ball_start_y = np.random.uniform(-0.15, 0.15)
                 self.defending_goal = self.goal_line_left
                 goal_x = self.goal_line_left
