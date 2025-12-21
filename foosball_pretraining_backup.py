@@ -910,13 +910,12 @@ def pretrain_all_agents(defense_timesteps: int = 100000, attack_timesteps: int =
             attack_env = DummyVecEnv([make_attack_env])
             print("🎨 Mode VISUALISATION activé (1 environnement)")
         else:
-            env = make_vec_env(
+            attack_env = make_vec_env(
             make_attack_env,
             n_envs=num_envs,
             vec_env_cls=SubprocVecEnv,
             vec_env_kwargs=dict(start_method="fork")
             )
-            attack_env = SubprocVecEnv([make_attack_env for _ in range(num_envs)])
             print(f"⚡ Mode RAPIDE activé ({num_envs} environnements parallèles)")
         
         # Changer l'environnement du modèle existant
